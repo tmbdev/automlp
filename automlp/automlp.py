@@ -315,10 +315,6 @@ class Trainer(object):
         self.model.META["loss"] = result
         return result
 
-    def train_dataset(self, dataset, ntrain=100000, options=None, batch_size=None):
-        loader = torchdata.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        return self.train_dataloader(loader, ntrain=ntrain, options=options)
-
     def evaluate_dataloader(self, loader, classification=False):
         totals = []
         losses = []
@@ -346,7 +342,8 @@ class Trainer(object):
         self.model.META["loss"] = result
         return result
 
-    def train_dataset(self, dataset, ntrain=100000, options=None, batch_size=None):
+    def train_dataset(self, dataset, ntrain=None, options=None, batch_size=None):
+        assert batch_size is not None
         loader = torchdata.DataLoader(dataset, batch_size=batch_size, shuffle=True)
         return self.train_dataloader(loader, ntrain=ntrain, options=options)
 
