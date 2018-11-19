@@ -490,6 +490,8 @@ class AutoMLP(object):
     def selection(self, population):
         if len(population) == 0:
             return []
+        population = [model for model in population
+                      if model.META["loss"] < float('inf')]
         for model in population:
             model.KEY = (1.0 + randn() * self.selection_noise) * \
                 model.META["loss"]
@@ -530,10 +532,14 @@ class AutoMLP(object):
             self.training.set_batch_size(batch_size)
             training_loss = trainer.train_dataloader(
                 self.training, ntrain=ntrain)
-            assert not isnan(training_loss)
+            if isnan(training_loss):
+                training_loss = float('inf')
+                logging.info("nan training_loss")
             test_loss = trainer.evaluate_dataloader(
                 self.testing, classification=self.classification)
-            assert not isnan(test_loss)
+            if isnan(test_loss):
+                test_loss = float('inf')
+                logging.info("nan test_loss")
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
@@ -552,14 +558,14 @@ class AutoMLP(object):
             self.population = self.selection(self.population + old_population)
             best = self.best_model
             latest = self.population[0]
-            print(
+            logging.info("{} best {} {} latest {} {}".format(
                 r,
                 "best",
                 best.META["ntrain"],
                 best.META["loss"],
                 "latest",
                 latest.META["ntrain"],
-                latest.META["loss"])
+                latest.META["loss"]))
             if latest.META["ntrain"] > self.maxtrain:
                 break
             if latest.META["ntrain"] > self.mintrain and latest.META["ntrain"] - \
@@ -665,7 +671,7 @@ class GridSearch(object):
                 test_loss = trainer.evaluate_dataloader(
                     self.testing, classification=self.classification)
                 self.after_training(self)
-                print("{} {}".format(len(self.population), dict(model.META["params"])))
+                logging.info("{} {}".format(len(self.population), dict(model.META["params"])))
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
