@@ -459,8 +459,8 @@ class AutoMLP(object):
         self.initial = int(initial)
         self.epoch = int(epoch)
         self.mintrain = 5e5
-        self.maxtrain = maxtrain
-        self.maxrounds = max(0, maxtrain - initial) // epoch
+        self.maxtrain = int(maxtrain)
+        self.maxrounds = int(max(0, maxtrain - initial) / epoch)
         self.selection_noise = selection_noise
         self.eval_batch_size = eval_batch_size
         self.stop_no_improvement = stop_no_improvement
