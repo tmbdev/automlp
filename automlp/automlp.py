@@ -535,11 +535,17 @@ class AutoMLP(object):
             if isnan(training_loss):
                 training_loss = float('inf')
                 logging.info("{}: nan training_loss".format(dict(model.META["params"])))
+                model.META['loss'] = float('inf')
+                model.cpu()
+                continue
             test_loss = trainer.evaluate_dataloader(
                 self.testing, classification=self.classification)
             if isnan(test_loss):
                 test_loss = float('inf')
                 logging.info("{}: nan test_loss".format(dict(model.META["params"])))
+                model.META['loss'] = float('inf')
+                model.cpu()
+                continue
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
