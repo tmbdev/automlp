@@ -1,25 +1,27 @@
+from __future__ import print_function
 import copy as pycopy
 import logging
 import sys
 import time
 from random import randint, uniform
 
-import numpy as np
-from IPython import display
-from numpy import *
-
-import h5py
 import matplotlib.pyplot as plt
-import parameters as params
+import numpy as np
 import pylab
 import torch
+import torch.utils.data as torchdata
 import torchvision
+from IPython import display
+from numpy import *
 from pylab import randn
 from scipy import ndimage as ndi
 from torch import nn, optim
-import torch.utils.data as torchdata
+
+import h5py
+import parameters as params
 
 training_figsize = (4, 4)
+
 
 class ArrayDataset(object):
     def __init__(self, inputs, targets):
@@ -33,47 +35,48 @@ class ArrayDataset(object):
     def __getitem__(self, index):
         return from_numpy(self.inputs[index]), from_numpy(self.targets[index])
 
+
+def repeated_iterator(loader, epochs):
+    for epoch in xrange(epochs):
+        for sample in loader:
+            yield sample
+
+def unbatching_iterator(loader, epochs):
+    samples = []
+    for epoch in xrange(epochs):
+        for batch in loader:
+            for i in xrange(len(batch[0])):
+                sample = [x[i] for x in batch]
+                yield sample
+
 class RebatchingLoader(torchdata.DataLoader):
-    def __init__(self, loader, batch_size=1, epochs=1):
+    def __init__(self, loader, batch_size=1, epochs=1000000000):
+        assert not isinstance(loader, torchdata.Dataset)
+        assert isinstance(loader, torchdata.DataLoader), type(loader)
         self.loader = loader
+        self.epochs = epochs
         self.batch_size = batch_size
         self.source = None
-        self.epochs = epochs
-    def start(self):
-        if self.source is None:
-            self.source = iter(self.loader)
-            self.index = 0
-            self.batch = self.source.next()
+
     def set_batch_size(self, bs):
         self.batch_size = bs
-    def get_sample(self):
-        self.start()
-        try:
-            while self.index >= len(self.batch[0]):
-                self.batch = self.source.next()
-                self.index = 0
-        except StopIteration:
-            return None
-        result = [x[self.index] for x in self.batch]
-        self.index += 1
-        return result
+
     def __len__(self):
-        self.start()
-        return (len(self.loader) * len(self.batch[0])) // self.batch_size
+        return (self.epochs * len(self.loader) * self.loader.batch_size) // self.batch_size
+
     def __iter__(self):
-        while self.epochs > 0:
-            samples = []
-            while len(samples) < self.batch_size:
-                sample = self.get_sample()
-                if sample is None: break
-                samples.append(sample)
-            if len(samples) > 0:
-                samples = map(list, zip(*samples))
-                samples = [torch.stack(x) for x in samples]
-                yield tuple(samples)
-            else:
-                self.source = None
-                self.epochs -= 1
+        samples = []
+        for sample in unbatching_iterator(self.loader, self.epochs):
+            samples.append(sample)
+            if len(samples) >= self.batch_size:
+                samples = map(list, zip(*samples))[:self.batch_size]
+                yield [torch.stack(x) for x in samples]
+                samples = samples[self.batch_size:]
+        if len(samples)>0:
+            # may lose some samples if we change batch size at end
+            samples = map(list, zip(*samples))
+            yield [torch.stack(x) for x in samples]
+
 
 def deprecated(f):
     def g():
@@ -307,7 +310,8 @@ class Trainer(object):
         while n < ntrain:
             for inputs, targets in loader:
                 n += len(inputs)
-                if n >= ntrain: break
+                if n >= ntrain:
+                    break
                 loss = self.train_batch(inputs, targets)
                 losses.append(loss)
         result = mean(losses[-100:])
@@ -329,7 +333,8 @@ class Trainer(object):
                     targets = targets.reshape(-1)
                     loss = float((pred != targets).sum())
                 else:
-                    target = smart_target(targets, outputs, self.mode).to(self.device)
+                    target = smart_target(
+                        targets, outputs, self.mode).to(self.device)
                     loss = float(self.criterion(outputs, target))
                 totals += [outputs.size(0)]
                 losses += [loss]
@@ -338,18 +343,21 @@ class Trainer(object):
         else:
             result = mean(losses)
         log_model(self.model, "eval", type="loss", loss=result,
-            total=sum(totals), ntrain=self.model.META["ntrain"])
+                  total=sum(totals), ntrain=self.model.META["ntrain"])
         self.model.META["loss"] = result
         return result
 
     def train_dataset(self, dataset, ntrain=None, options=None, batch_size=None):
         assert batch_size is not None
-        loader = torchdata.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        loader = torchdata.DataLoader(
+            dataset, batch_size=batch_size, shuffle=True)
         return self.train_dataloader(loader, ntrain=ntrain, options=options)
 
     def evaluate_dataset(self, dataset, classification=False, batch_size=200):
-        loader = torchdata.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        loader = torchdata.DataLoader(
+            dataset, batch_size=batch_size, shuffle=False)
         return self.evaluate_dataloader(loader, classification=classification)
+
 
 default_parameters = params.ParameterSet(
     params.LogParameter("lr", 1e-6, 1e2),
@@ -414,6 +422,7 @@ def plot_automlp(amlp, **kw):
     else:
         plot_models(amlp.population, **kw)
 
+
 class AutoMLP(object):
     def __init__(self,
                  make_model,
@@ -436,11 +445,13 @@ class AutoMLP(object):
                  verbose=False,
                  classification=False):
         if isinstance(training, torchdata.Dataset):
-            training = torchdata.DataLoader(data, batch_size=16, shuffle=True, num_workers=2)
+            training = torchdata.DataLoader(
+                training, batch_size=16, shuffle=True)
         if isinstance(testing, torchdata.Dataset):
-            testing = torchdata.DataLoader(data, batch_size=128, shuffle=False, num_workers=2)
+            testing = torchdata.DataLoader(
+                testing, batch_size=128, shuffle=False)
         self.make_model = make_model
-        self.training = RebatchingLoader(training, epochs=1000000)
+        self.training = RebatchingLoader(training)
         self.testing = testing
         self.parameters = parameters
         self.initial_popsize = initial_popsize
@@ -596,9 +607,13 @@ class GridSearch(object):
                  verbose=False,
                  classification=False):
         if isinstance(training, torchdata.Dataset):
-            training = torchdata.DataLoader(data, batch_size=8, shuffle=True, num_workers=2)
+            training = torchdata.DataLoader(
+                training, batch_size=8, shuffle=True)
+        if isinstance(training, torchdata.DataLoader):
+            training = RebatchingLoader(training)
         if isinstance(testing, torchdata.Dataset):
-            testing = torchdata.DataLoader(data, batch_size=128, shuffle=False, num_workers=2)
+            testing = torchdata.DataLoader(
+                testing, batch_size=128, shuffle=False)
         self.make_model = make_model
         self.training = training
         self.testing = testing
@@ -625,24 +640,6 @@ class GridSearch(object):
             return True
         return model.META["loss"] < other.META["loss"]
 
-    def train_population(self, population, ntrain=50000, verbose=False):
-        sys.stdout.write("training")
-        sys.stdout.flush()
-        for i, model in enumerate(population):
-            sys.stdout.write(" {}".format(len(population) - i))
-            sys.stdout.flush()
-            ntrained = model.META.get("ntrain", 0)
-            model.cuda()
-            batch_size = model.META["params"].get("batch_size")
-            training_loss = trainer.train_dataloader(
-                self.training, ntrain=ntrain, batch_size=batch_size)
-            test_loss = trainer.evaluate_dataloader(
-                self.testing, classification=True)
-            model.cpu()
-            if self.is_better(model, self.best_model):
-                self.best_model = model
-        sys.stdout.write("\n")
-
     def train(self):
         self.population = []
         self.exploration = params.Exploration(self.parameters)
@@ -666,6 +663,7 @@ class GridSearch(object):
                 test_loss = trainer.evaluate_dataloader(
                     self.testing, classification=self.classification)
                 self.after_training(self)
+                print("{} {}".format(len(self.population), dict(model.META["params"])))
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
@@ -673,5 +671,3 @@ class GridSearch(object):
             model.cpu()
         self.after_training(None)
         return self.best_model
-
-

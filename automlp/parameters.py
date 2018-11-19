@@ -9,10 +9,9 @@ from collections import OrderedDict
 from math import ceil, floor, log10
 
 import numpy as np
-from numpy import clip
-
 import scipy.spatial.distance as distance
 import simplejson
+from numpy import clip
 from pylab import randn
 
 
@@ -306,7 +305,7 @@ class ParameterSet(object):
         :param p: parameter
         :returns: self
         """
-        
+
         assert isinstance(p, Parameter)
         self.parameters[p.name] = p
         return self
@@ -316,7 +315,7 @@ class ParameterSet(object):
 
         :returns: OrderedDict of values.
         """
-        
+
         result = OrderedDict([(p.name, p.pick())
                               for p in self.parameters.values()])
         return result
@@ -379,7 +378,7 @@ class Exploration(object):
         :rtype: 
 
         """
-        
+
         import redis
         self.red_key = kw.get("key", "exploration")
         self.red_connection = kw
