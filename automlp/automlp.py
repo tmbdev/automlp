@@ -530,8 +530,10 @@ class AutoMLP(object):
             self.training.set_batch_size(batch_size)
             training_loss = trainer.train_dataloader(
                 self.training, ntrain=ntrain)
+            assert not isnan(training_loss)
             test_loss = trainer.evaluate_dataloader(
                 self.testing, classification=self.classification)
+            assert not isnan(test_loss)
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
