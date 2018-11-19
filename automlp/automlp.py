@@ -458,7 +458,7 @@ class AutoMLP(object):
         self.popsize = popsize
         self.initial = int(initial)
         self.epoch = int(epoch)
-        self.mintrain = 5e5
+        self.mintrain = int(mintrain)
         self.maxtrain = int(maxtrain)
         self.maxrounds = int(max(0, maxtrain - initial) / epoch)
         self.selection_noise = selection_noise
