@@ -162,11 +162,13 @@ def as_tensor(images):
         raise ValueError("unknown dtype: {}".format(images.dtype))
 
 
-@deprecated
-def one_hot_tensor(classes, nclasses=None, value=1.0):
-    classes = as_class_tensor(classes)
-    if nclasses is None:
-        nclasses = 1 + np.amax(classes)
+def one_hot_tensor(classes, nclasses, value=1.0):
+    classes = classes.to(torch.int64)
+    targets = torch.zeros(len(classes), nclasses)
+    targets = targets.scatter(
+        1, classes.unsqueeze(1).to(
+            targets.device), value)
+    return targets
 
 
 def getbatch_random(dataset, batch_size, convert=from_numpy):
@@ -253,7 +255,7 @@ class Trainer(object):
 
         self.make_optimizer = make_optimizer
         self.device = device or guess_input_device(model)
-        set_mode(self, mode)
+        self.set_mode(mode)
 
 
     def set_mode(self, mode):
