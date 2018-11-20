@@ -255,7 +255,10 @@ class Trainer(object):
         self.device = device or guess_input_device(model)
         self.mode = mode
 
-        if mode.lower() == "crossentropy":
+        if mode.lower() == "custom":
+            self.normalizer = None
+            self.criterion = None
+        elif mode.lower() == "crossentropy":
             self.normalizer = lambda x: x
             self.criterion = nn.CrossEntropyLoss().to(self.device)
         elif mode.lower() == "logistic_mse":
