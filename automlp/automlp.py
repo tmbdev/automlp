@@ -241,7 +241,7 @@ def generic_make_optimizer(model, options):
 
 class Trainer(object):
 
-    def __init__(self, model, mode, device=None,
+    def __init__(self, model, mode="crossentropy", device=None,
                  make_optimizer=generic_make_optimizer):
         self.model = model
         if not hasattr(model, "META"):
@@ -250,14 +250,19 @@ class Trainer(object):
             model.META["ntrain"] = 0
         if "loss" not in model.META:
             model.META["loss"] = 1e37
+
         self.make_optimizer = make_optimizer
-
         self.device = device or guess_input_device(model)
-        self.mode = mode
+        set_mode(self, mode)
 
-        if mode.lower() == "custom":
-            self.normalizer = None
-            self.criterion = None
+
+    def set_mode(self, mode):
+        self.make_target = smart_target
+        self.mode = mode
+        if isinstance(mode, dict):
+            self.normalizer = mode.get("normalizer", lambda x: x)
+            self.make_target = mode.get("target", smart_target)
+            self.criterion = mode.get("criterion", nn.MSELoss()).to(self.device)
         elif mode.lower() == "crossentropy":
             self.normalizer = lambda x: x
             self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -284,7 +289,7 @@ class Trainer(object):
         self.optimizer.zero_grad()
         with torch.set_grad_enabled(True):
             outputs = self.forward_batch(images)
-            target = smart_target(classes, outputs, self.mode)
+            target = self.make_target(classes, outputs, self.mode)
             loss = self.criterion(outputs, target.to(self.device))
             loss.backward()
             self.optimizer.step()
