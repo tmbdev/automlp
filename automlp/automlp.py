@@ -259,11 +259,11 @@ class Trainer(object):
 
 
     def set_mode(self, mode):
-        self.make_target = smart_target
+        self.make_target = lambda t, x: smart_target(t, x, mode)
         self.mode = mode
         if isinstance(mode, dict):
             self.normalizer = mode.get("normalizer", lambda x: x)
-            self.make_target = mode.get("target", smart_target)
+            self.make_target = mode.get("target", self.make_target)
             self.criterion = mode.get("criterion", nn.MSELoss()).to(self.device)
         elif mode.lower() == "crossentropy":
             self.normalizer = lambda x: x
@@ -291,8 +291,8 @@ class Trainer(object):
         self.optimizer.zero_grad()
         with torch.set_grad_enabled(True):
             outputs = self.forward_batch(images)
-            target = self.make_target(classes, outputs, self.mode)
-            loss = self.criterion(outputs, target.to(self.device))
+            target = self.make_target(classes, outputs).to(self.device)
+            loss = self.criterion(outputs, target).to(self.device)
             loss.backward()
             self.optimizer.step()
         self.model.META["ntrain"] += len(outputs)
@@ -343,8 +343,7 @@ class Trainer(object):
                     targets = targets.reshape(-1)
                     loss = float((pred != targets).sum())
                 else:
-                    target = smart_target(
-                        targets, outputs, self.mode).to(self.device)
+                    target = self.make_target(targets, outputs).to(self.device)
                     loss = float(self.criterion(outputs, target))
                 totals += [outputs.size(0)]
                 losses += [loss]
