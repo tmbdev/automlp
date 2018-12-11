@@ -153,12 +153,19 @@ def smart_target(classes, outputs, mode, value=1.0):
             targets.device), value)
     return targets
 
-p
+
 class Trainer(object):
     """A wrapper that helps with training a model."""
 
     def __init__(self, model, mode="crossentropy", device=None,
                  make_optimizer=generic_make_optimizer):
+        """Wrap a trainer around a model.
+
+        :param model: model to be trained
+        :param mode: training mode (crossentropy, linear_mse, logistic_mse, or dict)
+        :param device: input device for model (guesses if None)
+        :param make_optimizer: function for instantiating the optimizer
+        """
         self.model = model
         if not hasattr(model, "META"):
             model.META = {}
@@ -173,6 +180,25 @@ class Trainer(object):
 
 
     def set_mode(self, mode):
+        """Set the training mode.
+
+        :param mode: training mode
+
+        Training modes:
+        - crossentropy - uses nn.CrossEntropyLoss; target must be classes
+        - logistic_mse - passes output through nn.Sigmoid, then uses nn.MSELoss
+        - linear_mse - uses nn.MSELoss directly on output
+        - a dictionary: defines normalizer, make_target, and criterion functions
+
+        The crossentropy and logistic_mse modes take exactly the same
+        models for classification.
+
+        When a dictionary is given:
+        - mode["normalizer"] is a function applied to the output of the model (default: identity)
+        - mode["target"] is a function that makes a target from the given input (default: smart_target)
+        - mode["criterion"] is an nn.Criterion (default: nn.MSELoss)
+
+        """
         self.make_target = lambda t, x: smart_target(t, x, mode)
         self.mode = mode
         if isinstance(mode, dict):
@@ -195,16 +221,30 @@ class Trainer(object):
             self.normalizer = lambda x: x
             self.criterion = mode
 
-    def forward_batch(self, images):
-        inputs = from_numpy(images).to(self.device)
+    def forward_batch(self, batch):
+        """Forward propagate a batch through the model.
+
+        :param batch: 
+        :returns: outputs
+        :rtype: torch.Tensor
+        """
+        inputs = from_numpy(batch).to(self.device)
         outputs = self.model.forward(inputs)
         outputs = self.normalizer(outputs)
         return outputs
 
-    def train_batch(self, images, classes):
+    def train_batch(self, inputs, classes):
+        """Train a batch.
+
+        :param inputs: inputs to model
+        :param classes: targets/classes (classes if rank is one less than output, otherwise target)
+        :returns: total loss for batch
+        :rtype: float
+
+        """
         self.optimizer.zero_grad()
         with torch.set_grad_enabled(True):
-            outputs = self.forward_batch(images)
+            outputs = self.forward_batch(inputs)
             target = self.make_target(classes, outputs).to(self.device)
             loss = self.criterion(outputs, target).to(self.device)
             loss.backward()
@@ -212,21 +252,48 @@ class Trainer(object):
         self.model.META["ntrain"] += len(outputs)
         return float(loss.cpu())
 
-    def classify(self, images, batch_size=200):
+    def classify(self, inputs, batch_size=200):
+        """Perform classification on a tensor of inputs
+
+        :param inputs: tensor of inputs (first dim = batch dim)
+        :param batch_size: batch size for classification
+        :returns: clssifications
+        :rtype: numpy array
+
+        """
         results = []
         with torch.no_grad():
-            for i in range(0, len(images), batch_size):
-                outputs = self.forward_batch(images[i:i + batch_size])
+            for i in range(0, len(inputs), batch_size):
+                outputs = self.forward_batch(inputs[i:i + batch_size])
                 total += outputs.size(0)
                 _, indexes = outputs.cpu().max(1)
                 results.append(indexes.numpy())
         return np.concatenate(results)
 
     def set_optimizer(self, options):
+        """Set the optimizer/parameters (including learning rate).
+
+        :param options: dictionary of optimizer options
+
+        The dictionary contains "__type__" for the optimizer type
+        and otherwise the optimizer parameters as keyword arguments.
+        See `generic_make_optimizer` for options.
+
+        """
         log_model(self.model, "options", options=options)
         self.optimizer = self.make_optimizer(self.model, options)
 
     def train_dataloader(self, loader, ntrain=100000, options=None):
+        """Given a dataloader, train the model on it for the given number of samples.
+
+        :param loader: nn.DataLoader
+        :param ntrain: number of samples to train with
+        :param options: optimizer options (learning rate, etc.)
+        :returns: average losses towards end of training
+
+        NB: Use an automlp.RebatchingLoader to change the batchsize.
+
+        """
         if options is not None:
             self.set_optimizer(options)
         losses = []
@@ -244,6 +311,12 @@ class Trainer(object):
         return result
 
     def evaluate_dataloader(self, loader, classification=False):
+        """Given a dataloader, evaluate the model on the samples.
+
+        :param loader: nn.DataLoader
+        :param classification: evaluate using classification accuracy, not loss
+        :returns: average loss
+        """
         totals = []
         losses = []
         with torch.no_grad():
@@ -271,12 +344,31 @@ class Trainer(object):
         return result
 
     def train_dataset(self, dataset, ntrain=None, options=None, batch_size=None):
+        """Train on a dataset.
+
+        :param dataset: nn.Dataset
+        :param ntrain: number of samples to train for
+        :param options: optimizer options
+        :returns: training loss estimate (towards end)
+
+        The batch_size is usually taken from options, but can be overridden.
+
+        """
+        
         assert batch_size is not None
         loader = torchdata.DataLoader(
             dataset, batch_size=batch_size, shuffle=True)
         return self.train_dataloader(loader, ntrain=ntrain, options=options)
 
     def evaluate_dataset(self, dataset, classification=False, batch_size=200):
+        """Evaluate on a dataset.
+
+        :param dataset: nn.Dataset
+        :param classification: evaluate classification error instead of loss
+        :param batch_size: batch size
+        :returns: average loss
+
+        """
         loader = torchdata.DataLoader(
             dataset, batch_size=batch_size, shuffle=False)
         return self.evaluate_dataloader(loader, classification=classification)

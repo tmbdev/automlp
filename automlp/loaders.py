@@ -22,6 +22,12 @@ import params
 
 
 def from_numpy(a):
+    """Robust conversion from anything to torch.Tensor
+
+    :param a: anything
+    :returns: torch.Tensor or Python number
+
+    """
     if isinstance(a, (int, float)):
         return a
     if isinstance(a, torch.Tensor):
@@ -32,6 +38,17 @@ def from_numpy(a):
 
 
 def one_hot_tensor(classes, nclasses, value=1.0):
+    """Construct a one-hot encoding for the given classes.
+
+    :param classes: classes (torch.Tensor)
+    :param nclasses: number of classes
+    :param value: value of "one"
+    :returns: one-hot encoding
+
+    This works for arbitrary rank tensors. It assumes
+    that dim 0 is the batch and inserts the one-hot encoding
+    before dim 1.
+    """
     classes = classes.to(torch.int64)
     targets = torch.zeros(len(classes), nclasses)
     targets = targets.scatter(
@@ -41,6 +58,12 @@ def one_hot_tensor(classes, nclasses, value=1.0):
 
 
 def getbatch_random(dataset, batch_size, convert=from_numpy):
+    """Given a dataset, return a randomly chosen batch.
+
+    :param dataset: a Dataset
+    :param batch_size: desired batch size
+    :param convert: conversion function
+    """
     n = len(dataset)
     batch = [dataset[randint(0, n - 1)] for i in range(batch_size)]
     inputs = [convert(sample[0]) for sample in batch]
@@ -49,6 +72,12 @@ def getbatch_random(dataset, batch_size, convert=from_numpy):
 
 
 def dataset_batches(dataset, batch_size, convert=from_numpy):
+    """Iterate over batches from a Dataset.
+
+    :param dataset: a Dataset
+    :param batch_size: desired batch size
+    :param convert: conversion function
+    """
     inputs = []
     targets = []
     for sample in dataset:
@@ -62,7 +91,18 @@ def dataset_batches(dataset, batch_size, convert=from_numpy):
 
 
 class ArrayDataset(object):
+    """Convert arrays into a dataset."""
     def __init__(self, inputs, targets):
+        """Convert arrays into a Dataset.
+
+        :param inputs: input array
+        :param targets: targets array
+
+        Dim 0 is assumed to be the sample number, the remaining dimensions are as is.
+        Works for both Numpy and torch.Tensor arrays.
+
+        """
+        
         assert len(inputs) == len(targets)
         self.inputs = inputs
         self.targets = targets
@@ -75,11 +115,26 @@ class ArrayDataset(object):
 
 
 def repeated_iterator(loader, epochs):
+    """Iterate over an object repeatedly.
+
+    :param loader: object to be iterated over (usually DataLoader)
+    :param epochs: number of epochs to iterate
+    :returns: iterator
+
+    """
+
     for epoch in xrange(epochs):
         for sample in loader:
             yield sample
 
 def unbatching_iterator(loader, epochs):
+    """Iterate over individual samples, given a DataLoader.
+
+    :param loader: DataLoader
+    :param epochs: number of epochs to iterate
+    :returns: iterator over individual samples (unbatched)
+
+    """
     samples = []
     for epoch in xrange(epochs):
         for batch in loader:
@@ -89,6 +144,13 @@ def unbatching_iterator(loader, epochs):
 
 class RebatchingLoader(torchdata.DataLoader):
     def __init__(self, loader, batch_size=1, epochs=1000000000):
+        """A wrapper around a DataLoader that changes batch sizes.
+
+        :param loader: original loader
+        :param batch_size: new batch size
+        :param epochs: number of epochs to iterate for
+
+        """
         assert not isinstance(loader, torchdata.Dataset)
         assert isinstance(loader, torchdata.DataLoader), type(loader)
         self.loader = loader
@@ -97,12 +159,24 @@ class RebatchingLoader(torchdata.DataLoader):
         self.source = None
 
     def set_batch_size(self, bs):
+        """Dynamically change the batch size.
+
+        :param bs: new batch size
+        """
         self.batch_size = bs
 
     def __len__(self):
+        """Total # samples.
+
+        :returns: #samples (approximate)
+        """
         return (self.epochs * len(self.loader) * self.loader.batch_size) // self.batch_size
 
     def __iter__(self):
+        """Create an iterator over rebatched samples.
+
+        :returns: iterator
+        """
         samples = []
         for sample in unbatching_iterator(self.loader, self.epochs):
             samples.append(sample)
