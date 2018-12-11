@@ -591,3 +591,12 @@ class Exploration(object):
             return self.pick_farthest()
         else:
             return self.pick_top()
+
+def explore_parameters(parameterset, n, ncandidates=10):
+    ex = Exploration(parameterset)
+    ex.ncandidates = ncandidates
+    result = []
+    for i in xrange(n):
+        pv = ex.pick_farthest(record=True)
+        result.append(pv)
+    return result
