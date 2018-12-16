@@ -21,7 +21,7 @@ import h5py
 import params
 
 from .trainer import Trainer
-from .loaders import RebatchingLoader, deprecated
+from .loaders import RebatchingLoader
 
 training_figsize = (4, 4)
 
