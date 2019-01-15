@@ -294,14 +294,12 @@ class AutoMLP(object):
             self.population = self.selection(self.population + old_population)
             best = self.best_model
             latest = self.population[0]
-            logging.info("{} best {} {} latest {} {}".format(
+            logging.info("round {} best {}@{} latest {}@{}".format(
                 r,
-                "best",
-                best.META["ntrain"],
                 best.META["loss"],
-                "latest",
-                latest.META["ntrain"],
-                latest.META["loss"]))
+                best.META["ntrain"],
+                latest.META["loss"],
+                latest.META["ntrain"]))
             if latest.META["ntrain"] > self.maxtrain:
                 break
             if latest.META["ntrain"] > self.mintrain and latest.META["ntrain"] - \
