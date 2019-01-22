@@ -71,8 +71,8 @@ def generic_make_optimizer(model, options):
 
     :param model: the model for which the optimizer is to be created
     :param options: the options
-    :returns: 
-    :rtype: 
+    :returns:
+    :rtype:
 
     """
     opt = options.get("__type__", "sgd")
@@ -224,7 +224,7 @@ class Trainer(object):
     def forward_batch(self, batch):
         """Forward propagate a batch through the model.
 
-        :param batch: 
+        :param batch:
         :returns: outputs
         :rtype: torch.Tensor
         """
@@ -354,7 +354,7 @@ class Trainer(object):
         The batch_size is usually taken from options, but can be overridden.
 
         """
-        
+
         assert batch_size is not None
         loader = torchdata.DataLoader(
             dataset, batch_size=batch_size, shuffle=True)
