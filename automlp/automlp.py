@@ -423,7 +423,9 @@ class GridSearch(object):
                 test_loss = trainer.evaluate_dataloader(
                     self.testing, classification=self.classification)
                 self.after_training(self)
-                logging.info("{} {}".format(len(self.population), dict(model.META["params"])))
+                logging.info("ntrain {} test_loss {} training_loss {} pop {} params {}".format(
+                    ntrain, test_loss, training_loss,
+                    len(self.population), dict(model.META["params"])))
             model.cpu()
             if self.is_better(model, self.best_model):
                 self.best_model = model
