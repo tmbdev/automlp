@@ -424,7 +424,7 @@ class GridSearch(object):
                     self.testing, classification=self.classification)
                 self.after_training(self)
                 logging.info("ntrain {} test_loss {} training_loss {} pop {} params {}".format(
-                    ntrain, test_loss, training_loss,
+                    model.META["ntrain"], test_loss, training_loss,
                     len(self.population), dict(model.META["params"])))
             model.cpu()
             if self.is_better(model, self.best_model):
