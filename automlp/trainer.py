@@ -328,7 +328,7 @@ class Trainer(object):
                         targets = targets.cpu().max(1)
                     pred = pred.reshape(-1)
                     targets = targets.reshape(-1)
-                    loss = float((pred != targets).sum())
+                    loss = float((pred.int() != targets.int()).int().sum())
                 else:
                     target = self.make_target(targets, outputs).to(self.device)
                     loss = float(self.criterion(outputs, target))
