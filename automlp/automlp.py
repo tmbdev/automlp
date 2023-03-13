@@ -17,7 +17,6 @@ from pylab import randn
 from scipy import ndimage as ndi
 from torch import nn, optim
 
-import h5py
 from . import params
 
 from .trainer import Trainer
