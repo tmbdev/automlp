@@ -18,7 +18,7 @@ from scipy import ndimage as ndi
 from torch import nn, optim
 
 import h5py
-import params
+from . import params
 
 from .trainer import Trainer
 from .loaders import RebatchingLoader
