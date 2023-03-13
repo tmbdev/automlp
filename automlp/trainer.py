@@ -17,9 +17,6 @@ from pylab import randn
 from scipy import ndimage as ndi
 from torch import nn, optim
 
-import h5py
-import params
-
 from .loaders import from_numpy, one_hot_tensor
 
 def deprecated(f):
