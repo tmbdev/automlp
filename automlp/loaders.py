@@ -17,10 +17,6 @@ from pylab import randn
 from scipy import ndimage as ndi
 from torch import nn, optim
 
-import h5py
-import params
-
-
 def from_numpy(a):
     """Robust conversion from anything to torch.Tensor
 
